@@ -7,9 +7,9 @@ func NewOpen(owner eos.AccountName, symbol eos.Symbol, ram_payer eos.AccountName
 		Account: AN("eosio.token"),
 		Name:    ActN("open"),
 		Authorization: []eos.PermissionLevel{
-			{Actor: to, Permission: PN("active")},
+			{Actor: ram_payer, Permission: PN("active")},
 		},
-		ActionData: eos.NewActionData(Issue{
+		ActionData: eos.NewActionData(Open{
 			Owner:		owner,
 			Symbol: 	symbol,
 			RamPayer:	ram_payer,
