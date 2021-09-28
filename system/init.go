@@ -31,6 +31,14 @@ func init() {
 	eos.RegisterAction(AN("eosio"), ActN("updateauth"), UpdateAuth{})
 	eos.RegisterAction(AN("eosio"), ActN("setramrate"), SetRAMRate{})
 	eos.RegisterAction(AN("eosio"), ActN("setalimits"), Setalimits{})
+
+	eos.RegisterAction(AN("eosio"), ActN("createtier"), Createtier{})
+	eos.RegisterAction(AN("eosio"), ActN("setramsponsr"), Setramsponsr{})
+	eos.RegisterAction(AN("eosio"), ActN("setdeftier"), Setdeftier{})
+	eos.RegisterAction(AN("eosio"), ActN("setramcurve"), Setramcurve{})
+	eos.RegisterAction(AN("eosio"), ActN("setramtrade"), Setramtrade{})
+	eos.RegisterAction(AN("eosio"), ActN("newactconfig"), Newactconfig{})
+	eos.RegisterAction(AN("eosio"), ActN("activatechn"), nil)
 }
 
 var AN = eos.AN
