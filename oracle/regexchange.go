@@ -1,6 +1,6 @@
 package oracle
 
-import "github.com/ultraio/eos-go"
+import "github.com/eoscanada/eos-go"
 
 func NewRegexchange(exchange eos.AccountName) *eos.Action {
 	return &eos.Action{

@@ -1,8 +1,8 @@
 package eba
 
 import (
-	eos "github.com/ultraio/eos-go"
-	"github.com/ultraio/eos-go/ecc"
+	"github.com/eoscanada/eos-go"
+	"github.com/eoscanada/eos-go/ecc"
 )
 
 func NewRegidp(id_providers []Provider) *eos.Action {

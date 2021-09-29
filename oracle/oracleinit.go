@@ -1,6 +1,6 @@
 package oracle
 
-import "github.com/ultraio/eos-go"
+import "github.com/eoscanada/eos-go"
 
 func NewInit(interval uint8, cache_window uint32, final_price_table_size []uint32, final_moving_average_settings []eos.Asset, ultra_comprehensive_rate_weight uint32) *eos.Action {
 	return &eos.Action{

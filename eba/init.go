@@ -1,6 +1,6 @@
 package eba
 
-import "github.com/ultraio/eos-go"
+import "github.com/eoscanada/eos-go"
 
 func init() {
 	eos.RegisterAction(AN("eosio.eba"), ActN("regidp"), Regidp{})
