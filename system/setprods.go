@@ -2,6 +2,7 @@ package system
 
 import (
 	eos "github.com/eoscanada/eos-go"
+	"github.com/eoscanada/eos-go/ecc"
 )
 
 // NewSetPriv returns a `setpriv` action that lives on the
@@ -27,7 +28,7 @@ type SetProds struct {
 	Schedule []eos.AccountName `json:"schedule"`
 }
 
-// type ProducerKey struct {
-// 	ProducerName    eos.AccountName `json:"producer_name"`
-// 	BlockSigningKey ecc.PublicKey   `json:"block_signing_key"`
-// }
+type ProducerKey struct {
+	ProducerName    eos.AccountName `json:"producer_name"`
+	BlockSigningKey ecc.PublicKey   `json:"block_signing_key"`
+}
