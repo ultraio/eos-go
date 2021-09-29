@@ -1,11 +1,10 @@
 package eba
 
 import (
-	"github.com/eoscanada/eos-go"
-	"github.com/eoscanada/eos-go/ecc"
+	eos "github.com/eoscanada/eos-go"
 )
 
-func NewRegidp(id_providers []Provider) *eos.Action {
+func NewRegidp(id_providers []eos.Provider) *eos.Action {
 	return &eos.Action{
 		Account: AN("eosio.eba"),
 		Name:    ActN("regidp"),
@@ -21,12 +20,7 @@ func NewRegidp(id_providers []Provider) *eos.Action {
 	}
 }
 
-type Provider struct {
-	Account eos.AccountName `json:"account"`
-	Key     ecc.PublicKey   `json:"key"`
-}
-
 // Open represents the `open` struct on the `eosio.token` contract.
 type Regidp struct {
-	IdProviders []Provider `json:"id_providers,omitempty"`
+	IdProviders []eos.Provider `json:"id_providers,omitempty"`
 }
