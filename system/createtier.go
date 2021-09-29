@@ -14,7 +14,7 @@ func NewCreatetier(tier eos.AccountName, max_free_permission_objects uint64, max
 				Permission: eos.PermissionName("active"),
 			},
 		},
-		ActionData: eos.NewActionData(Setramsponsr{
+		ActionData: eos.NewActionData(Createtier{
 			Tier:                         tier,
 			MaxFreePermissionObjects:     max_free_permission_objects,
 			MaxFreeSharedKeys:            max_free_shared_keys,
