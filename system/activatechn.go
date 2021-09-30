@@ -4,7 +4,7 @@ import (
 	eos "github.com/eoscanada/eos-go"
 )
 
-func NewActivatechn(tier eos.AccountName) *eos.Action {
+func NewActivatechn() *eos.Action {
 	a := &eos.Action{
 		Account: AN("eosio"),
 		Name:    ActN("activatechn"),
