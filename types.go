@@ -1711,8 +1711,3 @@ func (o *fcVariantBlob) UnmarshalBinary(decoder *Decoder) error {
 	*o = fcVariantBlob(blob)
 	return nil
 }
-
-type Provider struct {
-	Account AccountName   `json:"account"`
-	Key     ecc.PublicKey `json:"key"`
-}
