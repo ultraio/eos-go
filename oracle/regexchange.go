@@ -5,7 +5,7 @@ import "github.com/eoscanada/eos-go"
 func NewRegexchange(exchange eos.AccountName) *eos.Action {
 	return &eos.Action{
 		Account: AN("eosio.oracle"),
-		Name:    ActN("init"),
+		Name:    ActN("regexchange"),
 		Authorization: []eos.PermissionLevel{
 			{
 				Actor:      AN("ultra.oracle"),
