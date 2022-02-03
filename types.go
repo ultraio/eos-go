@@ -64,6 +64,7 @@ type AccountResourceLimit struct {
 type DelegatedBandwidth struct {
 	From      AccountName `json:"from"`
 	To        AccountName `json:"to"`
+//ultra-andrey-bezrukov --- BLOCK-80 Integrate ultra power into dfuse and remove rex related tables
 //	NetWeight Asset       `json:"net_weight"`
 //	CPUWeight Asset       `json:"cpu_weight"`
 	PowerWeight Asset     `json:"power_weight"`
