@@ -480,7 +480,7 @@ func NewAssetFromString(in string) (out Asset, err error) {
 		return out, err
 	}
 
-	if out.Symbol.Symbol == "" {
+	if out.Symbol.Symbol == "" && !out.IsZero() {
 		return out, fmt.Errorf("invalid format %q, expected an amount and a currency symbol", in)
 	}
 
@@ -533,8 +533,8 @@ func NewFixedSymbolAssetFromString(symbol Symbol, input string) (out Asset, err 
 
 func newAssetFromString(in string) (out Asset, err error) {
 
-	// special case for "0 " which is a valid representation of an empty Asset
-	if in == "0 " {
+	// special case for "0" which is a valid representation of an empty Asset
+	if strings.TrimSpace(in) == "0" {
 		return Asset{}, nil
 	}
 
