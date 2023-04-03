@@ -19,7 +19,7 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-var symbolRegex = regexp.MustCompile("^[0-9],[A-Z]{1,7}$")
+var symbolRegex = regexp.MustCompile("^[0-9]{1,2},[A-Z]{1,7}$")
 var symbolCodeRegex = regexp.MustCompile("^[A-Z]{1,7}$")
 
 // For reference:
@@ -89,6 +89,9 @@ type VoterInfo struct {
 	LastVoteWeight    Float64       `json:"last_vote_weight"`
 	ProxiedVoteWeight Float64       `json:"proxied_vote_weight"`
 	IsProxy           byte          `json:"is_proxy"`
+	Flags1            int64         `json:"flags1"`    // added since EOSIO/Leap v2.0
+	Reserved2         int64         `json:"reserved2"` // added since EOSIO/Leap v2.0
+	Reserved3         Asset         `json:"reserved3"` // added since EOSIO/Leap v2.0
 }
 
 type RefundRequest struct {
@@ -313,11 +316,11 @@ func StringToSymbol(str string) (Symbol, error) {
 	if !symbolRegex.MatchString(str) {
 		return symbol, fmt.Errorf("%s is not a valid symbol", str)
 	}
-
-	precision, _ := strconv.ParseUint(string(str[0]), 10, 8)
+	arrs := strings.Split(str, ",")
+	precision, _ := strconv.ParseUint(string(arrs[0]), 10, 8)
 
 	symbol.Precision = uint8(precision)
-	symbol.Symbol = str[2:]
+	symbol.Symbol = arrs[1]
 
 	return symbol, nil
 }
@@ -372,6 +375,23 @@ func (s Symbol) ToName() (string, error) {
 
 func (s Symbol) String() string {
 	return fmt.Sprintf("%d,%s", s.Precision, s.Symbol)
+}
+
+func (s *Symbol) UnmarshalJSON(data []byte) error {
+	var str string
+	err := json.Unmarshal(data, &str)
+	if err != nil {
+		return err
+	}
+
+	sym, err := StringToSymbol(str)
+	if err != nil {
+		return err
+	}
+
+	*s = sym
+
+	return nil
 }
 
 type SymbolCode uint64
@@ -435,6 +455,11 @@ var EOSSymbol = Symbol{Precision: 4, Symbol: "EOS"}
 // here just to speed up things.
 var REXSymbol = Symbol{Precision: 4, Symbol: "REX"}
 
+// TNTSymbol represents the standard EOSIO Testnet symbol on the testnet chain.
+// Temporary Network Token (TNT) is the native token of the EOSIO Testnet.
+// It's here just to speed up things.
+var TNTSymbol = Symbol{Precision: 4, Symbol: "TNT"}
+
 func NewEOSAsset(amount int64) Asset {
 	return Asset{Amount: Int64(amount), Symbol: EOSSymbol}
 }
@@ -469,6 +494,10 @@ func NewEOSAssetFromString(input string) (Asset, error) {
 
 func NewREXAssetFromString(input string) (Asset, error) {
 	return NewFixedSymbolAssetFromString(REXSymbol, input)
+}
+
+func NewTNTAssetFromString(input string) (Asset, error) {
+	return NewFixedSymbolAssetFromString(TNTSymbol, input)
 }
 
 func NewFixedSymbolAssetFromString(symbol Symbol, input string) (out Asset, err error) {
@@ -590,10 +619,30 @@ func (a Asset) MarshalJSON() (data []byte, err error) {
 	return json.Marshal(a.String())
 }
 
+// RexInfo was added since EOSIO/Leap v2.0
+type RexInfo struct {
+	Version    uint32      `json:"version"`
+	Owner      AccountName `json:"owner"`
+	VoteStake  Asset       `json:"vote_stake"`
+	RexBalance Asset       `json:"rex_balance"`
+	MaturedRex uint64      `json:"matured_rex"`
+
+	// TODO: set the exact type
+	RexMaturities []interface{} `json:"rex_maturities"`
+}
+
+// SimpleAction was added since EOSIO/Leap v2.0
+// chain_plugin/chain_plugin.hpp::eosio::chain_apis::linked_action
+type LinkedAction struct {
+	Account AccountName `json:"account"`
+	Action  ActionName  `json:"action,omitempty"`
+}
+
 type Permission struct {
-	PermName     string    `json:"perm_name"`
-	Parent       string    `json:"parent"`
-	RequiredAuth Authority `json:"required_auth"`
+	PermName      string         `json:"perm_name"`
+	Parent        string         `json:"parent"`
+	RequiredAuth  Authority      `json:"required_auth"`
+	LinkedActions []LinkedAction `json:"linked_actions"` // added since EOSIO/Leap v2.0, TODO: find the better type from the current implementation
 }
 
 type PermissionLevel struct {
@@ -627,6 +676,10 @@ func NewPermissionLevel(in string) (out PermissionLevel, err error) {
 	}
 
 	return
+}
+
+func (p PermissionLevel) String() string {
+	return fmt.Sprintf("%s@%s", p.Actor, p.Permission)
 }
 
 type PermissionLevelWeight struct {
@@ -847,14 +900,19 @@ type BlockTimestamp struct {
 	time.Time
 }
 
-const BlockTimestampFormat = "2006-01-02T15:04:05.999"
+// blockTimestampFormat
+//
+// We deal with timezone in a conditional matter so we allowed for example the
+// unmarshalling to accept with and without timezone specifier.
+const blockTimestampFormat = "2006-01-02T15:04:05.999"
 
 func (t BlockTimestamp) MarshalJSON() ([]byte, error) {
-	strTime := t.Format(BlockTimestampFormat)
+	strTime := t.Format(blockTimestampFormat)
 	if len(strTime) == len("2006-01-02T15:04:05.5") {
 		strTime += "00"
 	}
-	return []byte(fmt.Sprintf("%q", strTime)), nil
+
+	return []byte(`"` + strTime + `"`), nil
 }
 
 func (t *BlockTimestamp) UnmarshalJSON(data []byte) (err error) {
@@ -862,10 +920,11 @@ func (t *BlockTimestamp) UnmarshalJSON(data []byte) (err error) {
 		return nil
 	}
 
-	t.Time, err = time.Parse(`"`+BlockTimestampFormat+`"`, string(data))
+	t.Time, err = time.Parse(`"`+blockTimestampFormat+`"`, string(data))
 	if err != nil {
-		t.Time, err = time.Parse(`"`+BlockTimestampFormat+`Z07:00"`, string(data))
+		t.Time, err = time.Parse(`"`+blockTimestampFormat+`Z07:00"`, string(data))
 	}
+
 	return err
 }
 
@@ -895,6 +954,12 @@ func (f *TimePoint) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// AsTime returns the TimePoint as time.Time in UTC
+func (f TimePoint) AsTime() time.Time {
+	// copied from time.UnixMicro, the latter was added in 1.17
+	return time.Unix(int64(f)/1e6, (int64(f)%1e6)*1e3).UTC()
+}
+
 // TimePointSec represents the number of seconds since EPOCH (Jan 1st 1970)
 type TimePointSec uint32
 
@@ -921,6 +986,26 @@ func (f *TimePointSec) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// AsTime returns the TimePointSec as time.Time in UTC
+func (f TimePointSec) AsTime() time.Time {
+	return time.Unix(int64(f), 0).UTC()
+}
+
+// nowadays, big number (especially float) represents as string type in JSON, and parsing it when unmarshaling.
+// but it would be a breaking change against the previous implementation - marshal into the number type
+// the SDK needs to follow the standard, but does not make breaking change
+// between the collision point, we thought that mode setter would be the best solution for today
+// default: number type - as the previous
+var bigIntMarshalToString = false
+
+func SetFloat64MarshalingTypeIntoString() {
+	bigIntMarshalToString = true
+}
+
+func SetFloat64MarshalingTypeIntoNumber() {
+	bigIntMarshalToString = false
+}
+
 type JSONFloat64 = Float64
 
 type Float64 float64
@@ -935,7 +1020,12 @@ func (f *Float64) MarshalJSON() ([]byte, error) {
 		return []byte("\"nan\""), nil
 	default:
 	}
-	return json.Marshal(float64(*f))
+
+	if bigIntMarshalToString {
+		return json.Marshal(fmt.Sprintf("%f", float64(*f)))
+	} else {
+		return json.Marshal(float64(*f))
+	}
 }
 
 func (f *Float64) UnmarshalJSON(data []byte) error {
@@ -1490,8 +1580,9 @@ func (t fcVariantType) String() string {
 }
 
 // FIXME: Ideally, we would re-use `BaseVariant` but that requires some
-//        re-thinking of the decoder to make it efficient to read FCVariant types. For now,
-//        let's re-code it a bit to make it as efficient as possible.
+//
+//	re-thinking of the decoder to make it efficient to read FCVariant types. For now,
+//	let's re-code it a bit to make it as efficient as possible.
 type fcVariant struct {
 	TypeID fcVariantType
 	Impl   interface{}
@@ -1505,7 +1596,8 @@ func (a fcVariant) IsNil() bool {
 // and object, turning everything along the way in Go primitives types.
 //
 // **Note** For `Int64` and `Uint64`, we return `eos.Int64` and `eos.Uint64` types
-//          so that JSON marshalling is done correctly for large numbers
+//
+//	so that JSON marshalling is done correctly for large numbers
 func (a fcVariant) ToNative() interface{} {
 	if a.TypeID == fcVariantNullType ||
 		a.TypeID == fcVariantDoubleType ||
