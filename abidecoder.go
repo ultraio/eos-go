@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
+	// "reflect"
 	"go.uber.org/zap"
 )
 
@@ -46,40 +46,41 @@ func (a *ABI) DecodeTableRow(tableName TableName, data []byte) ([]byte, error) {
 	}
 
 	/*ultra-Adam---BLOCK-1831 make user group integration user-friendly ---start/end*/
+	// table delta
 	// check if table name is 1st hand purchase, convert integers to a string of logical expression
-	if tableName == "fctrprchs.a" {
-		
-		groupRestrictionValue, exists := builtStruct["group_restriction"]
+	// if tableName == "fctrprchs.a" {
+	// 	groupRestrictionValue, exists := builtStruct["group_restriction"]
+	// 	zlog.Info("group_restriction value and type: ", zap.Any("value: ", groupRestrictionValue), zap.String("type:  ", reflect.TypeOf(groupRestrictionValue).String()))	
 
-		if exists {
-			groupRestrictionSlice, isSlice := groupRestrictionValue.([]uint64);
-			if  isSlice && len(groupRestrictionSlice) > 0 {
-				groupRestrictionStr := ""
-				for i,v := range groupRestrictionSlice{
-					if (v&OR) == OR { // OR
-						if i != 0 { // Ignore first OR
-							groupRestrictionStr += "|"
-						}
-					} else { // AND
-						if i != 0 { // Ignore first AND
-							groupRestrictionStr += "&"
-						}
-					}
+	// 	if exists {
+	// 		groupRestrictionSlice, isSlice := groupRestrictionValue.([]uint64);
+	// 		if  isSlice && len(groupRestrictionSlice) > 0 {
+	// 			groupRestrictionStr := ""
+	// 			for i,v := range groupRestrictionSlice{
+	// 				if (v&OR) == OR { // OR
+	// 					if i != 0 { // Ignore first OR
+	// 						groupRestrictionStr += "|"
+	// 					}
+	// 				} else { // AND
+	// 					if i != 0 { // Ignore first AND
+	// 						groupRestrictionStr += "&"
+	// 					}
+	// 				}
 
-					if (v & NEGATION) == NEGATION { // NEGATION
-						groupRestrictionStr += "~"
-					}
+	// 				if (v & NEGATION) == NEGATION { // NEGATION
+	// 					groupRestrictionStr += "~"
+	// 				}
 
-					// Extract group ID
-					groupID := v & ^(NEGATION + OR)
-					groupRestrictionStr += strconv.FormatUint(groupID, 10)
-				}
-				builtStruct["group_restriction"] = groupRestrictionStr;
-			}
-		}
+	// 				// Extract group ID
+	// 				groupID := v & ^(NEGATION + OR)
+	// 				groupRestrictionStr += strconv.FormatUint(groupID, 10)
+	// 			}
+	// 			builtStruct["group_restriction"] = groupRestrictionStr;
+	// 		}
+	// 	}
 
-	}
-	/*ultra-Adam---BLOCK-1831 make user group integration user-friendly ---end*/
+	// }
+	// /*ultra-Adam---BLOCK-1831 make user group integration user-friendly ---end*/
 
 	return json.Marshal(builtStruct)
 
@@ -90,6 +91,9 @@ func (a *ABI) DecodeTableRowTyped(tableType string, data []byte) ([]byte, error)
 	if err != nil {
 		return nil, err
 	}
+
+
+
 	return json.Marshal(builtStruct)
 
 }
@@ -135,7 +139,62 @@ func (a *ABI) decode(binaryDecoder *Decoder, structName string) (map[string]inte
 		}
 	}
 
-	return a.decodeFields(binaryDecoder, structure.Fields, builtStruct)
+	finalStruct, err := a.decodeFields(binaryDecoder, structure.Fields, builtStruct)
+
+	// only handle the group_restriction field from the token factory purchase table
+	if structName == "token_factory_purchase_v0" {
+		zlog.Info("purchase option table : ", zap.Any("value: ", finalStruct), zap.Any("type:  ", structure), zap.Any("struct name: ", structName) )
+
+		/*ultra-Adam---BLOCK-1831 make user group integration user-friendly ---start/end*/
+		groupRestrictionValue, exists := finalStruct["group_restriction"]
+		zlog.Info("group_restriction value and type: ", zap.Any("value: ", groupRestrictionValue))	
+		if exists {
+			// todo: check tmr, why the cast failed?
+			groupRestrictionSlice, isSlice := groupRestrictionValue.([]interface{});
+			if !isSlice {
+				zlog.Info("group_restriction is not slice")	
+			}
+
+			if  isSlice && len(groupRestrictionSlice) > 0 {
+				groupRestrictionStr := ""
+				for i,item := range groupRestrictionSlice{
+					vtype := fmt.Sprintf("%T", item)
+					zlog.Info("var type: ", zap.Any("vtype: ", vtype) )
+
+					// First, assert to eos.Int64
+					uint64Val, ok := item.(Uint64)
+					if !ok {
+						zlog.Info("Failed to assert to Int64 type")	
+						return nil, fmt.Errorf("Failed to assert to Int64 type")
+					}
+
+					v := uint64(uint64Val)
+
+					if (v&OR) == OR { // OR
+						if i != 0 { // Ignore first OR
+							groupRestrictionStr += "|"
+						}
+					} else { // AND
+						if i != 0 { // Ignore first AND
+							groupRestrictionStr += "&"
+						}
+					}
+
+					if (v & NEGATION) == NEGATION { // NEGATION
+						groupRestrictionStr += "~"
+					}
+
+					// Extract group ID
+					groupID := v & ^(NEGATION + OR)
+					groupRestrictionStr += strconv.FormatUint(groupID, 10)
+				}
+				builtStruct["group_restriction"] = groupRestrictionStr;
+			}
+		}
+		/*ultra-Adam---BLOCK-1831 make user group integration user-friendly ---end*/
+	}
+
+	return finalStruct,err
 }
 
 func (a *ABI) decodeFields(binaryDecoder *Decoder, fields []FieldDef, builtStruct map[string]interface{}) (out map[string]interface{}, err error) {
@@ -146,6 +205,38 @@ func (a *ABI) decodeFields(binaryDecoder *Decoder, fields []FieldDef, builtStruc
 		if err != nil {
 			return nil, fmt.Errorf("decoding field %s: %w", field.Name, err)
 		}
+
+		// // adam: convert to string, change field type to string too
+		// if(field.Name == "group_restriction"){
+		// 	zlog.Info("group_restriction value and type: ", zap.Any("value: ", resultingValue), zap.String("type:  ", reflect.TypeOf(resultingValue).String()))
+
+		// 	groupRestrictionSlice, isSlice := resultingValue.([]uint64);
+		// 	zlog.Info("group_restriction ", zap.Int("length ", len(groupRestrictionSlice)), zap.Bool("isslice ", isSlice))		
+		// 	if isSlice && len(groupRestrictionSlice) > 0 {
+		// 		groupRestrictionStr := ""
+		// 		for i,v := range groupRestrictionSlice {
+		// 			zlog.Info("group_restriction ", zap.Int("index ", i), zap.Uint64("value", v))
+		// 			if (v&OR) == OR { // OR
+		// 				if i != 0 { // Ignore first OR
+		// 					groupRestrictionStr += "|"
+		// 				}
+		// 			} else { // AND
+		// 				if i != 0 { // Ignore first AND
+		// 					groupRestrictionStr += "&"
+		// 				}
+		// 			}
+
+		// 			if (v & NEGATION) == NEGATION { // NEGATION
+		// 				groupRestrictionStr += "~"
+		// 			}
+
+		// 			// Extract group ID
+		// 			groupID := v & ^(NEGATION + OR)
+		// 			groupRestrictionStr += strconv.FormatUint(groupID, 10)
+		// 		}
+		// 		resultingValue = groupRestrictionStr
+		// 	}
+		// }
 
 		if resultingValue != skipField {
 			out[field.Name] = resultingValue
