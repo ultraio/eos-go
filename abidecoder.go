@@ -45,43 +45,6 @@ func (a *ABI) DecodeTableRow(tableName TableName, data []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	/*ultra-Adam---BLOCK-1831 make user group integration user-friendly ---start/end*/
-	// table delta
-	// check if table name is 1st hand purchase, convert integers to a string of logical expression
-	// if tableName == "fctrprchs.a" {
-	// 	groupRestrictionValue, exists := builtStruct["group_restriction"]
-	// 	zlog.Info("group_restriction value and type: ", zap.Any("value: ", groupRestrictionValue), zap.String("type:  ", reflect.TypeOf(groupRestrictionValue).String()))	
-
-	// 	if exists {
-	// 		groupRestrictionSlice, isSlice := groupRestrictionValue.([]uint64);
-	// 		if  isSlice && len(groupRestrictionSlice) > 0 {
-	// 			groupRestrictionStr := ""
-	// 			for i,v := range groupRestrictionSlice{
-	// 				if (v&OR) == OR { // OR
-	// 					if i != 0 { // Ignore first OR
-	// 						groupRestrictionStr += "|"
-	// 					}
-	// 				} else { // AND
-	// 					if i != 0 { // Ignore first AND
-	// 						groupRestrictionStr += "&"
-	// 					}
-	// 				}
-
-	// 				if (v & NEGATION) == NEGATION { // NEGATION
-	// 					groupRestrictionStr += "~"
-	// 				}
-
-	// 				// Extract group ID
-	// 				groupID := v & ^(NEGATION + OR)
-	// 				groupRestrictionStr += strconv.FormatUint(groupID, 10)
-	// 			}
-	// 			builtStruct["group_restriction"] = groupRestrictionStr;
-	// 		}
-	// 	}
-
-	// }
-	// /*ultra-Adam---BLOCK-1831 make user group integration user-friendly ---end*/
-
 	return json.Marshal(builtStruct)
 
 }
@@ -205,38 +168,6 @@ func (a *ABI) decodeFields(binaryDecoder *Decoder, fields []FieldDef, builtStruc
 		if err != nil {
 			return nil, fmt.Errorf("decoding field %s: %w", field.Name, err)
 		}
-
-		// // adam: convert to string, change field type to string too
-		// if(field.Name == "group_restriction"){
-		// 	zlog.Info("group_restriction value and type: ", zap.Any("value: ", resultingValue), zap.String("type:  ", reflect.TypeOf(resultingValue).String()))
-
-		// 	groupRestrictionSlice, isSlice := resultingValue.([]uint64);
-		// 	zlog.Info("group_restriction ", zap.Int("length ", len(groupRestrictionSlice)), zap.Bool("isslice ", isSlice))		
-		// 	if isSlice && len(groupRestrictionSlice) > 0 {
-		// 		groupRestrictionStr := ""
-		// 		for i,v := range groupRestrictionSlice {
-		// 			zlog.Info("group_restriction ", zap.Int("index ", i), zap.Uint64("value", v))
-		// 			if (v&OR) == OR { // OR
-		// 				if i != 0 { // Ignore first OR
-		// 					groupRestrictionStr += "|"
-		// 				}
-		// 			} else { // AND
-		// 				if i != 0 { // Ignore first AND
-		// 					groupRestrictionStr += "&"
-		// 				}
-		// 			}
-
-		// 			if (v & NEGATION) == NEGATION { // NEGATION
-		// 				groupRestrictionStr += "~"
-		// 			}
-
-		// 			// Extract group ID
-		// 			groupID := v & ^(NEGATION + OR)
-		// 			groupRestrictionStr += strconv.FormatUint(groupID, 10)
-		// 		}
-		// 		resultingValue = groupRestrictionStr
-		// 	}
-		// }
 
 		if resultingValue != skipField {
 			out[field.Name] = resultingValue
