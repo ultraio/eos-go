@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	// "reflect"
+
 	"go.uber.org/zap"
 )
 
@@ -45,10 +45,6 @@ func (a *ABI) DecodeActionResult(data []byte, actionName ActionName) ([]byte, er
 	return json.Marshal(res)
 }
 
-/*ultra-Adam---BLOCK-1831 make user group integration user-friendly ---start/end*/
-const  OR 		uint64 = 0X1000_0000_0000_0000   // 0: AND, 1: OR
-const  NEGATION uint64 = 0X2000_0000_0000_0000   // 0: no negation, 1: Negation
-
 func (a *ABI) DecodeTableRow(tableName TableName, data []byte) ([]byte, error) {
 	binaryDecoder := NewDecoder(data)
 	tbl := a.TableForName(tableName)
@@ -71,14 +67,7 @@ func (a *ABI) DecodeTableRowTyped(tableType string, data []byte) ([]byte, error)
 		return nil, err
 	}
 
-
-
 	return json.Marshal(builtStruct)
-}
-
-func (a *ABI) DecodeTableRowTypedNative(tableType string, data []byte) (map[string]interface{}, error) {
-	binaryDecoder := NewDecoder(data)
-	return a.decode(binaryDecoder, tableType)
 }
 
 func (a *ABI) DecodeTableRowTypedNative(tableType string, data []byte) (map[string]interface{}, error) {
@@ -130,62 +119,7 @@ func (a *ABI) decode(binaryDecoder *Decoder, structName string) (map[string]inte
 		}
 	}
 
-	finalStruct, err := a.decodeFields(binaryDecoder, structure.Fields, builtStruct)
-
-	// only handle the group_restriction field from the token factory purchase table
-	if structName == "token_factory_purchase_v0" {
-		zlog.Info("purchase option table : ", zap.Any("value: ", finalStruct), zap.Any("type:  ", structure), zap.Any("struct name: ", structName) )
-
-		/*ultra-Adam---BLOCK-1831 make user group integration user-friendly ---start/end*/
-		groupRestrictionValue, exists := finalStruct["group_restriction"]
-		zlog.Info("group_restriction value and type: ", zap.Any("value: ", groupRestrictionValue))	
-		if exists {
-			// todo: check tmr, why the cast failed?
-			groupRestrictionSlice, isSlice := groupRestrictionValue.([]interface{});
-			if !isSlice {
-				zlog.Info("group_restriction is not slice")	
-			}
-
-			if  isSlice && len(groupRestrictionSlice) > 0 {
-				groupRestrictionStr := ""
-				for i,item := range groupRestrictionSlice{
-					vtype := fmt.Sprintf("%T", item)
-					zlog.Info("var type: ", zap.Any("vtype: ", vtype) )
-
-					// First, assert to eos.Int64
-					uint64Val, ok := item.(Uint64)
-					if !ok {
-						zlog.Info("Failed to assert to Int64 type")	
-						return nil, fmt.Errorf("Failed to assert to Int64 type")
-					}
-
-					v := uint64(uint64Val)
-
-					if (v&OR) == OR { // OR
-						if i != 0 { // Ignore first OR
-							groupRestrictionStr += "|"
-						}
-					} else { // AND
-						if i != 0 { // Ignore first AND
-							groupRestrictionStr += "&"
-						}
-					}
-
-					if (v & NEGATION) == NEGATION { // NEGATION
-						groupRestrictionStr += "~"
-					}
-
-					// Extract group ID
-					groupID := v & ^(NEGATION + OR)
-					groupRestrictionStr += strconv.FormatUint(groupID, 10)
-				}
-				builtStruct["group_restriction"] = groupRestrictionStr;
-			}
-		}
-		/*ultra-Adam---BLOCK-1831 make user group integration user-friendly ---end*/
-	}
-
-	return finalStruct,err
+	return a.decodeFields(binaryDecoder, structure.Fields, builtStruct)
 }
 
 func (a *ABI) decodeFields(binaryDecoder *Decoder, fields []FieldDef, builtStruct map[string]interface{}) (out map[string]interface{}, err error) {
