@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/eoscanada/eos-go/p2p"
-	"github.com/streamingfast/logging"
 )
 
 var peer = flag.String("peer", "", "peer")
@@ -15,9 +14,9 @@ var showLog = flag.Bool("v", false, "show detail log")
 func main() {
 	flag.Parse()
 
-	if *showLog {
-		logging.Set(logging.MustCreateLogger(), "github.com/eoscanada/eos-go/p2p")
-	}
+	//if *showLog {
+	//	logging.InstantiateLoggers(logging.WithDefaultLevel(zapcore.InfoLevel))
+	//}
 	defer p2p.SyncLogger()
 
 	relay := p2p.NewRelay(*listeningAddress, *peer)

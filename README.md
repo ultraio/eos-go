@@ -1,5 +1,4 @@
-EOS.IO API library for Go
-=========================
+## EOS.IO API library for Go
 
 [点击查看中文版](./README-cn.md)
 
@@ -19,47 +18,64 @@ This library is the basis for the `eos-bios` launch orchestrator tool
 at https://github.com/eoscanada/eos-bios
 
 
-Basic usage
------------
+### Basic usage
 
 ```go
-api := eos.New("http://testnet1.eos.io")
+package main
 
-infoResp, _ := api.GetInfo(ctx)
-accountResp, _ := api.GetAccount(ctx, "initn")
-fmt.Println("Permission for initn:", accountResp.Permissions[0].RequiredAuth.Keys)
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+
+	eos "github.com/eoscanada/eos-go"
+	cli "github.com/streamingfast/cli"
+)
+
+func main() {
+	api := eos.New("https://api.eosn.io")
+	ctx := context.Background()
+
+	infoResp, err := api.GetInfo(ctx)
+	cli.NoError(err, "unable to get chain info")
+
+	fmt.Println("Chain Info", toJson(infoResp))
+
+	accountResp, _ := api.GetAccount(ctx, "eosio")
+	fmt.Println("Account Info", toJson(accountResp))
+}
+
+func toJson(v interface{}) string {
+	out, err := json.MarshalIndent(v, "", "  ")
+	cli.NoError(err, "unable to marshal json")
+
+	return string(out)
+}
 ```
 
-`eosio.system` and `eosio.token` contract _Actions_ are respectively in:
-* https://github.com/eoscanada/eos-go/tree/master/system ([godocs](https://godoc.org/github.com/eoscanada/eos-go/system))
-* https://github.com/eoscanada/eos-go/tree/master/token ([godocs](https://godoc.org/github.com/eoscanada/eos-go/token))
+### Examples
 
-Binaries
---------
-
-There is some binaries in `main` packages under `cmd/`, mainly around P2P communication.
-
-Example
--------
-
-### Reference
+#### Reference
 
  * API
-    * [Get Chain Information](./example_api_get_info_test.go)
-    * [Transfer Token](./example_api_transfer_eos_test.go)
+	* [Get Account](./example_api_get_account_test.go)
+	* [Get Chain Information](./example_api_get_info_test.go)
+	* [Get Producers](./example_api_get_producers_test.go)
+	* [Transfer Token](./example_api_transfer_eos_test.go)
  * Decoding/Encoding
-    * [Decode Table Row](./example_abi_decode_test.go)
+	* [Decode Table Row](./example_abi_decode_test.go)
+ * Transaction
+	* [Transaction Sign & Pack](./example_trx_pack_test.go)
+	* [Transaction Unpack](./example_trx_unpack_test.go)
 
-### Running
+#### Running
 
 The easiest way to see the actual output for a given example is to add a line
 `// Output: any` at the very end of the test, looks like this for
-`ExampleAPI_GetInfo` file ([examples_api_get_info.go](./examples_api_get_info.go)):
+`ExampleAPI_GetInfo` file ([examples_api_get_info.go](./example_api_get_info_test.go)):
 
 ```
-    if err != nil {
-        panic(fmt.Errorf("json marshal response: %w", err))
-    }
+	...
 
     fmt.Println(string(bytes))
     // Output: any
@@ -84,20 +100,43 @@ requires having the authorizations and balance necessary to perform the
 transaction. It's quite possible to run them through a development environment
 however.
 
-#### Environment Variables
+### Binaries
 
-All examples uses by default the `https://mainnet.eos.dfuse.io` API endpoint for all
-HTTP communication and `peering.mainnet.eoscanada.com` for P2P communication.
+There is some binaries in `main` packages under `cmd/`, mainly around P2P communication.
+
+### Environment Variables
+
+All examples uses by default the `https://api.eosn.io` API endpoint for all
+HTTP communication and `peering.eosn.io` for P2P communication.
 They can respectively be overridden by specifying environment variable
 `EOS_GO_API_URL` and `EOS_GO_P2P_ENDPOINT` respectively.
 
-Contributing
-------------
+### Tests
+
+Some of our tests renders dates in the timezone of the OS. As such, if you have a bunch of
+failures around dates and times, it's probably because your timezone is not aligned with
+those in the tests.
+
+Run the tests with this to be in the same timezone as the expected one in golden files:
+
+```bash
+TZ=UTC go test ./...
+```
+
+### Release
+
+We are using [Goreleaser](https://goreleaser.com/) to perform releases. Install the `goreleaser` binary ([instructions](https://goreleaser.com/install/))
+and follow these steps:
+
+- Dry run release process first with `goreleaser release --skip-publish --skip-validate --rm-dist`
+- Publish **draft** release with `goreleaser release --rm-dist`
+- Open GitHub's release and check that the release is all good
+- Once everything is good, publish release, this will now also push the tag.
+
+### Contributing
 
 Any contributions are welcome, use your standard GitHub-fu to pitch in and improve.
 
-
-License
--------
+### License
 
 MIT
