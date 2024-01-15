@@ -40,7 +40,6 @@ func (a *ABI) DecodeTableRow(tableName TableName, data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return json.Marshal(builtStruct)
 
 }
@@ -50,7 +49,6 @@ func (a *ABI) DecodeTableRowTyped(tableType string, data []byte) ([]byte, error)
 	if err != nil {
 		return nil, err
 	}
-
 	return json.Marshal(builtStruct)
 
 }
