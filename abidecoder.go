@@ -96,7 +96,7 @@ func (a *ABI) decode(binaryDecoder *Decoder, structName string) (map[string]inte
 		}
 	}
 
-	return a.decodeFields(binaryDecoder, structure.Field, builtStruct)
+	return a.decodeFields(binaryDecoder, structure.Fields, builtStruct)
 }
 
 func (a *ABI) decodeFields(binaryDecoder *Decoder, fields []FieldDef, builtStruct map[string]interface{}) (out map[string]interface{}, err error) {
