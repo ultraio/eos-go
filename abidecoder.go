@@ -8,13 +8,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	// "reflect"
+
 	"go.uber.org/zap"
 )
 
 var NativeType = false
 
 func (a *ABI) DecodeAction(data []byte, actionName ActionName) ([]byte, error) {
+
 	binaryDecoder := NewDecoder(data)
 	action := a.ActionForName(actionName)
 	if action == nil {
@@ -26,12 +27,23 @@ func (a *ABI) DecodeAction(data []byte, actionName ActionName) ([]byte, error) {
 		return nil, err
 	}
 	return json.Marshal(builtStruct)
-
 }
 
-/*ultra-Adam---BLOCK-1831 make user group integration user-friendly ---start/end*/
-const  OR 		uint64 = 0X1000_0000_0000_0000   // 0: AND, 1: OR
-const  NEGATION uint64 = 0X2000_0000_0000_0000   // 0: no negation, 1: Negation
+func (a *ABI) DecodeActionResult(data []byte, actionName ActionName) ([]byte, error) {
+
+	binaryDecoder := NewDecoder(data)
+	actionResult := a.ActionResultForName(actionName)
+	if actionResult == nil {
+		return nil, fmt.Errorf("action_result %s not found in abi", actionName)
+	}
+
+	res, err := a.resolveField(binaryDecoder, actionResult.ResultType)
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(res)
+}
 
 func (a *ABI) DecodeTableRow(tableName TableName, data []byte) ([]byte, error) {
 	binaryDecoder := NewDecoder(data)
@@ -55,10 +67,7 @@ func (a *ABI) DecodeTableRowTyped(tableType string, data []byte) ([]byte, error)
 		return nil, err
 	}
 
-
-
 	return json.Marshal(builtStruct)
-
 }
 
 func (a *ABI) DecodeTableRowTypedNative(tableType string, data []byte) (map[string]interface{}, error) {
@@ -75,8 +84,16 @@ func (a *ABI) Decode(binaryDecoder *Decoder, structName string) ([]byte, error) 
 }
 
 func (a *ABI) decode(binaryDecoder *Decoder, structName string) (map[string]interface{}, error) {
-	if traceEnabled {
+	if tracer.Enabled() {
 		zlog.Debug("decode struct", zap.String("name", structName))
+	}
+
+	if variant := a.VariantForName(structName); variant != nil {
+		out, err := binaryDecoder.ReadUvarint32()
+		if err != nil {
+			zlog.Error("error reading variant", zap.Error(err))
+		}
+		structName = variant.Types[out]
 	}
 
 	structure := a.StructForName(structName)
@@ -86,12 +103,12 @@ func (a *ABI) decode(binaryDecoder *Decoder, structName string) (map[string]inte
 
 	builtStruct := map[string]interface{}{}
 	if structure.Base != "" {
-		if traceEnabled {
+		if tracer.Enabled() {
 			zlog.Debug("struct has base struct", zap.String("name", structName), zap.String("base", structure.Base))
 		}
 
 		baseName, isAlias := a.TypeNameForNewTypeName(structure.Base)
-		if isAlias && traceEnabled {
+		if isAlias && tracer.Enabled() {
 			zlog.Debug("base is an alias", zap.String("from", structure.Base), zap.String("to", baseName))
 		}
 
@@ -102,62 +119,7 @@ func (a *ABI) decode(binaryDecoder *Decoder, structName string) (map[string]inte
 		}
 	}
 
-	finalStruct, err := a.decodeFields(binaryDecoder, structure.Fields, builtStruct)
-
-	// only handle the group_restriction field from the token factory purchase table
-	if structName == "token_factory_purchase_v0" {
-		zlog.Info("purchase option table : ", zap.Any("value: ", finalStruct), zap.Any("type:  ", structure), zap.Any("struct name: ", structName) )
-
-		/*ultra-Adam---BLOCK-1831 make user group integration user-friendly ---start/end*/
-		groupRestrictionValue, exists := finalStruct["group_restriction"]
-		zlog.Info("group_restriction value and type: ", zap.Any("value: ", groupRestrictionValue))	
-		if exists {
-			// todo: check tmr, why the cast failed?
-			groupRestrictionSlice, isSlice := groupRestrictionValue.([]interface{});
-			if !isSlice {
-				zlog.Info("group_restriction is not slice")	
-			}
-
-			if  isSlice && len(groupRestrictionSlice) > 0 {
-				groupRestrictionStr := ""
-				for i,item := range groupRestrictionSlice{
-					vtype := fmt.Sprintf("%T", item)
-					zlog.Info("var type: ", zap.Any("vtype: ", vtype) )
-
-					// First, assert to eos.Int64
-					uint64Val, ok := item.(Uint64)
-					if !ok {
-						zlog.Info("Failed to assert to Int64 type")	
-						return nil, fmt.Errorf("Failed to assert to Int64 type")
-					}
-
-					v := uint64(uint64Val)
-
-					if (v&OR) == OR { // OR
-						if i != 0 { // Ignore first OR
-							groupRestrictionStr += "|"
-						}
-					} else { // AND
-						if i != 0 { // Ignore first AND
-							groupRestrictionStr += "&"
-						}
-					}
-
-					if (v & NEGATION) == NEGATION { // NEGATION
-						groupRestrictionStr += "~"
-					}
-
-					// Extract group ID
-					groupID := v & ^(NEGATION + OR)
-					groupRestrictionStr += strconv.FormatUint(groupID, 10)
-				}
-				builtStruct["group_restriction"] = groupRestrictionStr;
-			}
-		}
-		/*ultra-Adam---BLOCK-1831 make user group integration user-friendly ---end*/
-	}
-
-	return finalStruct,err
+	return a.decodeFields(binaryDecoder, structure.Fields, builtStruct)
 }
 
 func (a *ABI) decodeFields(binaryDecoder *Decoder, fields []FieldDef, builtStruct map[string]interface{}) (out map[string]interface{}, err error) {
@@ -191,7 +153,7 @@ func (a *ABI) resolveField(binaryDecoder *Decoder, initialFieldType string) (out
 	fieldType, isOptional, isArray, isBinaryExtension := analyzeFieldType(initialFieldType)
 	//fmt.Println("resolveField", isOptional, isArray, initialFieldType, fieldType)
 
-	if traceEnabled {
+	if tracer.Enabled() {
 		zlog.Debug("analyzed field",
 			zap.String("field_type", fieldType),
 			zap.Bool("is_optional", isOptional),
@@ -203,7 +165,7 @@ func (a *ABI) resolveField(binaryDecoder *Decoder, initialFieldType string) (out
 	// check if this field is an alias
 	aliasFieldType, isAlias := a.TypeNameForNewTypeName(fieldType)
 	if isAlias {
-		if traceEnabled {
+		if tracer.Enabled() {
 			zlog.Debug("type is an alias",
 				zap.String("from", fieldType),
 				zap.String("to", aliasFieldType),
@@ -214,7 +176,7 @@ func (a *ABI) resolveField(binaryDecoder *Decoder, initialFieldType string) (out
 
 	// check if the field is a binary extension
 	if isBinaryExtension && !binaryDecoder.hasRemaining() {
-		if traceEnabled {
+		if tracer.Enabled() {
 			zlog.Debug("type is a binary extension and no more data, skipping field", zap.String("type", fieldType))
 		}
 		return skipField, nil
@@ -228,7 +190,7 @@ func (a *ABI) resolveField(binaryDecoder *Decoder, initialFieldType string) (out
 		}
 
 		if b == 0 {
-			if traceEnabled {
+			if tracer.Enabled() {
 				zlog.Debug("field is not present")
 			}
 			if !a.fitNodeos {
@@ -299,12 +261,12 @@ func (a *ABI) read(binaryDecoder *Decoder, fieldType string) (interface{}, error
 		}
 
 		variantFieldType := variant.Types[variantIndex]
-		if traceEnabled {
+		if tracer.Enabled() {
 			zlog.Debug("field is a variant", zap.String("type", variantFieldType))
 		}
 
 		resolvedVariantFieldType, isAlias := a.TypeNameForNewTypeName(variantFieldType)
-		if isAlias && traceEnabled {
+		if isAlias && tracer.Enabled() {
 			zlog.Debug("variant type is an alias", zap.String("from", fieldType), zap.String("to", resolvedVariantFieldType))
 		}
 
@@ -483,7 +445,7 @@ func (a *ABI) read(binaryDecoder *Decoder, fieldType string) (interface{}, error
 		return nil, fmt.Errorf("read: %w", err)
 	}
 
-	if traceEnabled {
+	if tracer.Enabled() {
 		zlog.Debug("set field value",
 			zap.Reflect("value", value),
 		)
